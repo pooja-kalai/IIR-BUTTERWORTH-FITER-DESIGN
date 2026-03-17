@@ -9,62 +9,111 @@ PC installed with SCILAB.
 
 ## PROGRAM (LPF): 
 ```
+clc;
 clear;
-Fs = 5000;         
-fc = 1500;         
+close;
 
-b = [0.0929 0.2787 0.2787 0.0929];   
-a = [1.0000 -0.5772 0.4218 -0.0561];  
+// ---- Fixed Specifications ----
+wp = %pi/4;      // Passband frequency (rad/sample)
+ws = %pi/2;      // Stopband frequency (rad/sample)
+alphap = 1;      // Passband attenuation (dB)
+alphas = 15;     // Stopband attenuation (dB)
+T = 1;           // Sampling time
 
-Npoints = 512;
-[H, f_norm] = frmag(b, a, Npoints);
+// ---- Prewarping ----
+omegap = (2/T)*tan(wp/2);
+omegas = (2/T)*tan(ws/2);
 
-f = f_norm * Fs;
+// ---- Filter Order ----
+N = log10((10^(0.1*alphas)-1)/(10^(0.1*alphap)-1)) / (2*log10(omegas/omegap));
+N = ceil(N);
 
-clf();
-plot(f, 20*log10(H + %eps));
-xlabel("Frequency (Hz)");
-ylabel("Magnitude (dB)");
-title("Chebyshev Type I Low Pass Filter (Order 3)");
-xgrid();
+// ---- Cutoff Frequency ----
+omegac = omegap / ((10^(0.1*alphap)-1)^(1/(2*N)));
 
-disp(b, "Numerator coefficients (b):");
-disp(a, "Denominator coefficients (a):");
+// ---- Analog Filter ----
+hs = analpf(N, 'butt', [0,0], omegac);
+
+// ---- Bilinear Transformation ----
+z = poly(0, 'z');
+Hz = horner(hs, (2/T)*((z-1)/(z+1)));
+
+// ---- Frequency Response ----
+HW = frmag(Hz, 512);
+w = 0:%pi/511:%pi;
+
+// ---- Plot ----
+plot(w/%pi, abs(HW));
+xlabel('Normalized Frequency (×π rad/sample)');
+ylabel('Magnitude');
+title('Butterworth IIR LPF Frequency Response');
+
+// ---- Display Key Results ----
+disp("Filter Order N = "), disp(N);
+disp("Cutoff Frequency omegac = "), disp(omegac);
+disp("Digital Transfer Function H(z) = "), disp(Hz);
 ```
 
 
 ## PROGRAM (HPF): 
 ```
+clc;
 clear;
-Fs = 5000;          
+close;
 
-fc = 1500;          
+// ---- Specifications ----
+wp = %pi/2;      // Passband (HIGH)
+ws = %pi/4;      // Stopband (LOW)
+alphap = 1;      // Passband attenuation (dB)
+alphas = 15;     // Stopband attenuation (dB)
+T = 1;
 
-b = [0.4218 -0.5772 0.2787 -0.0929];   
-a = [1.0000 -0.5772 0.4218 -0.0561];  
+// ---- Prewarping ----
+omegap = (2/T)*tan(wp/2);
+omegas = (2/T)*tan(ws/2);
 
-Npoints = 512;
-[H, f_norm] = frmag(b, a, Npoints);
+// ---- Filter Order ----
+N = log10((10^(0.1*alphas)-1)/(10^(0.1*alphap)-1)) / (2*log10(omegap/omegas));
+N = ceil(N);
 
-f = f_norm * Fs;
+// ---- Cutoff Frequency ----
+omegac = omegap / ((10^(0.1*alphap)-1)^(1/(2*N)));
 
-clf();
-plot(f, 20*log10(H + %eps));
-xlabel("Frequency (Hz)");
-ylabel("Magnitude (dB)");
-title("Chebyshev Type I High Pass Filter (Order 3)");
-xgrid();
+// ---- Analog LPF Prototype ----
+hs = analpf(N, 'butt', [0,0], 1);   // normalized LPF
 
-disp(b, "Numerator coefficients (b):");
-disp(a, "Denominator coefficients (a):");
+// ---- LPF → HPF Transformation (IMPORTANT FIX) ----
+s = poly(0, 's');
+hs_hp = horner(hs, omegac ./ s);   // s → wc/s
+
+// ---- Bilinear Transformation ----
+z = poly(0, 'z');
+Hz = horner(hs_hp, (2/T)*((z-1)/(z+1)));
+
+// ---- Frequency Response ----
+HW = frmag(Hz, 512);
+w = 0:%pi/511:%pi;
+
+// ---- Plot ----
+plot(w/%pi, abs(HW));
+xlabel('Normalized Frequency (×π rad/sample)');
+ylabel('Magnitude');
+title('Butterworth IIR HPF Frequency Response');
+
+// ---- Display ----
+disp("Filter Order N = "), disp(N);
+disp("Cutoff Frequency omegac = "), disp(omegac);
+disp("H(z) = "), disp(Hz);
+
 ```
 
 ## OUTPUT (LPF) : 
-<img width="1920" height="1200" alt="image" src="https://github.com/user-attachments/assets/289e8255-8e54-4e54-825c-5c47b4df083d" />
+<img width="763" height="723" alt="image" src="https://github.com/user-attachments/assets/50b45656-c712-461b-afea-8d489f68bb5d" />
+
 
 ## OUTPUT (HPF) : 
-<img width="1920" height="1200" alt="image" src="https://github.com/user-attachments/assets/b0f3b5ae-07b5-4afb-8b19-a6e6b84c54f4" />
+<img width="759" height="722" alt="image" src="https://github.com/user-attachments/assets/be1e8f10-a940-4f79-affa-1c5d40ca26db" />
 
-## RESULT: 
 
-A 3rd-order Chebyshev Type I high-pass filter was designed with cutoff frequency 1500 Hz and sampling frequency 5000 Hz. The frequency response shows ripple in the passband and sharp attenuation in the stopband.
+# RESULT:
+Thus, the IIR Butterworth Low Pass Filter (LPF) and High Pass Filter (HPF) were plotted and output was verified.
